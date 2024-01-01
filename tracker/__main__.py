@@ -5,12 +5,13 @@ from telegram import Update
 
 from .application import app
 
-
 logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO
 )
 
 logging.getLogger("httpx").setLevel(logging.WARNING)
+logging.getLogger("apscheduler").setLevel(logging.DEBUG)
+
 logger = logging.getLogger(__name__)
 
 load_dotenv()
@@ -24,6 +25,7 @@ if not TOKEN:
 
 def main():
     app(TOKEN, WHITELIST).run_polling(allowed_updates=Update.ALL_TYPES)
+
 
 if __name__ == "__main__":
     main()

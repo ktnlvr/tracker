@@ -1,3 +1,4 @@
+from datetime import datetime
 from telegram.ext import (
     Application,
     CallbackContext,
@@ -7,9 +8,11 @@ from telegram.ext import (
 from typing import Optional
 from .task import Task
 
+
 class ChatData:
     def __init__(self):
         self.active_tasks: list[Task] = []
+        self.tz: Optional[datetime] = None
 
     def add_task(self, task: Task):
         self.active_tasks.append(task)

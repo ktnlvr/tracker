@@ -12,6 +12,7 @@ class Task(BaseModel):
     text: Optional[str]
     priority: Optional[int]
     at: Optional[datetime]
+    message_id: Optional[int]
 
     def __str__(self):
         desc = descriptor_from_task(self)
@@ -31,9 +32,9 @@ def task_from_text(text: str):
         now = datetime.now()
         if now.hour * 60 + now.minute > hours * 60 + minutes:
             now += timedelta(days=1)
-        at = now.replace(hour=hours, minute=minutes)
+        at = now.replace(hour=hours, minute=minutes, second=0, microsecond=0)
 
-    return Task(text=text, priority=priority, at=at)
+    return Task(text=text, priority=priority, at=at, message_id=None)
 
 
 def descriptor_from_task(task: Task) -> str:
