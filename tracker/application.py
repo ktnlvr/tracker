@@ -97,7 +97,7 @@ async def reminder_job(context: Context):
     assert chat_data != None
 
     for i, t in enumerate(chat_data.active_tasks):
-        if t is task:
+        if t == task:
             chat_data.delete_task(i)
             break
     else:
