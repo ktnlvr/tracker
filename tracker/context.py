@@ -16,7 +16,7 @@ class ChatData:
 
     def add_task(self, task: Task):
         self.active_tasks.append(task)
-        self.active_tasks.sort(key=lambda t: (t.priority or 0))
+        self.active_tasks.sort(key=Task.sort_key)
         self.active_tasks.reverse()
 
     def delete_task(self, task_idx: int) -> Task:

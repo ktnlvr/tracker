@@ -32,6 +32,12 @@ class Task(BaseModel):
             offset += 4
         return text
 
+    def sort_key(self) -> tuple:
+        return (
+            self.at.replace(hour=0, minute=0, second=0, microsecond=0),
+            self.priority,
+        )
+
 
 def task_from_text(text: str, tz: timezone | None = None):
     text = escape_markdown(text, version=2)

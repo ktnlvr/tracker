@@ -13,6 +13,7 @@ from telegram.ext import (
 from timezonefinder import TimezoneFinder
 from pytz import timezone, all_timezones
 
+from .env import TOKEN
 from .context import ChatData, Context
 from .reminders import dequeue_reminder, enqueue_reminder
 from .task import task_from_text
@@ -102,14 +103,14 @@ async def msg_to_tz(update: Update, context: Context) -> int:
     return ConversationHandler.END
 
 
-def app(token: str, whitelist: list[str]) -> Application:
+def app() -> Application:
     refresh_ntp_time_offset()
     context_types = ContextTypes(context=Context, chat_data=ChatData)
     persistence = PicklePersistence(filepath="state.pickle", update_interval=1)
 
     application = (
         Application.builder()
-        .token(token)
+        .token(TOKEN())
         .context_types(context_types)
         .persistence(persistence)
         .build()
