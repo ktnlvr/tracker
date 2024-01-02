@@ -43,7 +43,7 @@ def task_from_text(text: str, tz: timezone | None = None):
     time24 = matched_time24.group(0) if matched_time24 else None
 
     at = None
-    if time24 and tz != None:
+    if time24:
         special_spans.append(matched_time24.span())
         hours, minutes = map(int, time24.split(":"))
 

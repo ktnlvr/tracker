@@ -1,3 +1,4 @@
+from emoji import emojize
 from telegram.ext import Application
 from telegram import Update
 from telegram.ext import (
@@ -27,7 +28,7 @@ async def new_msg(update: Update, context: Context) -> None:
 
     remove_item_matcher = compile(r"-[0-9]+")
 
-    text = update.message.text
+    text = update.effective_message.text
 
     # TODO: refactor this
     if all(map(lambda substr: remove_item_matcher.match(substr), text.split())):
@@ -46,7 +47,14 @@ async def new_msg(update: Update, context: Context) -> None:
     data.add_task(task)
 
     if task.at != None:
-        enqueue_reminder(task, context.application, update.effective_chat.id)
+        if data.tz != None:
+            enqueue_reminder(task, context.application, update.effective_chat.id)
+        else:
+            await update.message.reply_markdown(
+                emojize(
+                    ":fire::warning: Hey, timezone not configured! No timers will be scheduled"
+                )
+            )
 
     idx = 0
     for i, t in enumerate(data.active_tasks):

@@ -25,9 +25,6 @@ async def reminder_job(context: Context):
 
 
 def enqueue_reminder(task: Task, application: Application, chat_id: int):
-    if task.at == None:
-        return
-
     adjusted_time = task.at - timedelta(seconds=ntp_time_offset())
     application.job_queue.run_once(
         reminder_job, adjusted_time, name=str(id(task)), chat_id=chat_id, data=task
