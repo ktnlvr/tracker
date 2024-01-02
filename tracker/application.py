@@ -69,14 +69,17 @@ async def new_msg(update: Update, context: Context) -> None:
         if t is task:
             idx = i
             break
-    await update.message.reply_markdown(f"`{i + 1}.` {task}")
+    await update.message.reply_markdown_v2(
+        f"`{i + 1}.` {task.as_markdown_str()}",
+        disable_notification=True,
+    )
 
 
 async def list_all(update: Update, context: Context) -> None:
-    fmt = lambda t: f"`{t[0] + 1}.` {t[1]}\n"
+    fmt = lambda t: f"`{t[0] + 1}.` {t[1].as_markdown_str()}\n"
     tasks = context.chat_data.active_tasks
     if tasks:
-        await update.message.reply_markdown(f"\n{''.join(map(fmt, enumerate(tasks)))}")
+        await update.message.reply_markdown_v2(f"\n{''.join(map(fmt, enumerate(tasks)))}")
     else:
         await update.message.reply_text("You don't have any tasks!")
 
@@ -103,6 +106,7 @@ async def reminder_job(context: Context):
     else:
         assert False
 
+
 async def start(update: Update, context: Context) -> int:
     await update.message.reply_text("Hello, send ur location")
     return 0
@@ -122,7 +126,7 @@ async def msg_to_tz(update: Update, context: Context) -> int:
     context.chat_data.tz = tz
 
     await update.message.reply_text(
-        f"Your timezone is {tz}, all the timers will adjust accordingly"
+        f"Your timezone is `{tz}`, all the timers will adjust accordingly"
     )
     return ConversationHandler.END
 
@@ -159,6 +163,5 @@ def app(token: str, whitelist: list[str]) -> Application:
 
     application.add_handler(tz_conversation)
     application.add_handler(CommandHandler("list", list_all))
-    application.add_handler(CommandHandler("relocate", msg_to_tz))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, new_msg))
     return application
