@@ -16,11 +16,20 @@ class ChatData:
 
     def add_task(self, task: Task):
         self.active_tasks.append(task)
+        self.active_tasks.sort(key=lambda t: (t.priority or 0))
+        self.active_tasks.reverse()
 
     def delete_task(self, task_idx: int) -> Task:
         task = self.active_tasks[task_idx]
         del self.active_tasks[task_idx]
         return task
+
+    def delete_task_if_exists(self, task: Task) -> True:
+        for i, t in enumerate(self.active_tasks):
+            if t == task:
+                self.delete_task(i)
+                return True
+        return False
 
 
 class Context(CallbackContext[ExtBot, dict, ChatData, dict]):

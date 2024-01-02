@@ -1,9 +1,11 @@
 from typing import Optional
 from pydantic import BaseModel
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from emoji import emojize
 from telegram.helpers import escape_markdown
 import re
+
+from .tz import ntp_time_offset
 
 priority_regex = re.compile(r"(!+)")
 time24_regex = re.compile(r"([0-9]{1,2}:[0-9]{2})")
@@ -14,6 +16,7 @@ class Task(BaseModel):
     priority: Optional[int]
     at: Optional[datetime]
     message_id: Optional[int]
+
     special_spans: list[tuple[int, int]]
 
     def __str__(self) -> str:
@@ -30,7 +33,7 @@ class Task(BaseModel):
         return text
 
 
-def task_from_text(text: str):
+def task_from_text(text: str, tz: timezone | None = None):
     text = escape_markdown(text, version=2)
     special_spans = []
 
@@ -40,16 +43,23 @@ def task_from_text(text: str):
     time24 = matched_time24.group(0) if matched_time24 else None
 
     at = None
-    if time24:
+    if time24 and tz != None:
         special_spans.append(matched_time24.span())
         hours, minutes = map(int, time24.split(":"))
 
-        now = datetime.now()
-        if now.hour * 60 + now.minute > hours * 60 + minutes:
-            now += timedelta(days=1)
+        # convert to true, system independent time
+        now = datetime.now(tz) + timedelta(seconds=ntp_time_offset())
         at = now.replace(hour=hours, minute=minutes, second=0, microsecond=0)
+        if at < now:
+            at += timedelta(days=1)
 
-    return Task(text=text, priority=priority, at=at, message_id=None, special_spans=special_spans)
+    return Task(
+        text=text,
+        priority=priority,
+        at=at,
+        message_id=None,
+        special_spans=special_spans,
+    )
 
 
 def descriptor_from_task(task: Task) -> str:
