@@ -1,5 +1,3 @@
-from emoji import emojize
-from telegram.ext import Application
 from telegram import Update
 from telegram.ext import (
     Application,
@@ -12,7 +10,8 @@ from telegram.ext import (
 )
 from timezonefinder import TimezoneFinder
 from pytz import timezone, all_timezones
-from datetime import datetime, timedelta
+
+from tracker.lang import get_text
 
 from .env import TOKEN
 from .context import ChatData, Context
@@ -26,6 +25,7 @@ tz_finder = TimezoneFinder()
 async def new_msg(update: Update, context: Context) -> None:
     from re import compile
 
+    lang = update.effective_user.language_code
     chat = context.chat_data
 
     remove_item_matcher = compile(r"-[0-9]+")
@@ -35,30 +35,39 @@ async def new_msg(update: Update, context: Context) -> None:
     # TODO: refactor this
     if all(map(lambda substr: remove_item_matcher.match(substr), text.split())):
         indices = list(map(lambda t: int(t[1:]), text.split()))
+
+        for idx in indices:
+            if idx > len(chat.active_tasks):
+                await update.message.reply_markdown(
+                    get_text("task_does_not_exist", idx=idx, lang=lang)
+                )
+                return
+
         for i, idx in enumerate(indices):
             task = chat.delete_task(idx - i - 1)
             dequeue_reminder(context, task)
 
-        await update.message.reply_markdown(
-            f"{'Task' if len(indices) == 1 else 'Tasks'} {', '.join(list(map(lambda x: f'`{x}`', indices)))} removed"
+        removed_tasks = ", ".join(list(map(lambda x: f"`{x}`", indices)))
+        task_text = get_text(
+            "task_removed" if len(indices) == 1 else "tasks_removed",
+            removed=removed_tasks,
+            lang=lang,
         )
+
+        await update.message.reply_markdown(task_text)
         return
 
     task = task_from_text(update.message.text, tz=chat.tz)
 
     if task.at != None:
         if task.at < true_now(task.at.tzinfo):
-            await update.message.reply_markdown("Can't schedule a task in the past")
+            await update.message.reply_markdown(get_text("task_in_the_past", lang=lang))
             return
 
         if chat.tz != None:
             enqueue_reminder(task, context.application, update.effective_chat.id)
         else:
-            await update.message.reply_markdown(
-                emojize(
-                    ":fire::warning: Hey, timezone not configured! No timers will be scheduled"
-                )
-            )
+            await update.message.reply_markdown(get_text("timezone_missing", lang=lang))
 
     task.message_id = update.message.message_id
     chat.add_task(task)
@@ -74,7 +83,8 @@ async def new_msg(update: Update, context: Context) -> None:
     )
 
 
-async def list_all(update: Update, context: Context) -> None:
+async def list_all(update: Update, context: Context):
+    lang = update.effective_user.language_code
     fmt = lambda t: f"`{t[0] + 1}.` {t[1].as_markdown_str()}\n"
     tasks = context.chat_data.active_tasks
     if tasks:
@@ -82,35 +92,39 @@ async def list_all(update: Update, context: Context) -> None:
             f"\n{''.join(map(fmt, enumerate(tasks)))}"
         )
     else:
-        await update.message.reply_text("You don't have any tasks!")
+        await update.message.reply_text(get_text("no_tasks", lang=lang))
 
 
-async def start(update: Update, context: Context) -> int:
-    await update.message.reply_text("Hello, send ur location")
+async def start(update: Update, _) -> int:
+    lang = update.effective_user.language_code
+    await update.message.reply_markdown(get_text("start", lang=lang))
     return 0
 
 
+async def help(update: Update, _):
+    lang = update.effective_user.language_code
+    await update.message.reply_markdown(get_text("help", lang=lang))
+
+
 async def msg_to_tz(update: Update, context: Context) -> int:
+    lang = update.effective_user.language_code
+
     if update.message.location != None:
         location = update.message.location
-        tz = tz_finder.timezone_at(lat=location.latitude, lng=location.longitude)
+        tz_name = tz_finder.timezone_at(lat=location.latitude, lng=location.longitude)
     else:
-        tz = update.effective_message.text
+        tz_name = update.effective_message.text
 
-    if tz not in all_timezones:
+    if tz_name not in all_timezones:
         await update.message.reply_markdown(
-            f"Sorry, timezone `{tz}` not found. Please make sure the timezone is formatted according to the timezone name like `UTC` or `Europe/Berlin`"
+            get_text("timezone_not_found", tz=tz_name, lang=lang)
         )
         return 0
 
-    tz = timezone(tz)
+    tz = timezone(tz_name)
     context.chat_data.tz = tz
 
-    time_on_server = datetime.now() + timedelta(seconds=ntp_time_offset())
-
-    await update.message.reply_markdown(
-        f"Your timezone is `{tz}`, all future timers will adjust accordingly. Time on the server: {time_on_server}"
-    )
+    await update.message.reply_markdown(get_text("timezone_set", tz=tz_name, lang=lang))
     return ConversationHandler.END
 
 
@@ -144,6 +158,7 @@ def app() -> Application:
         fallbacks=[],
     )
 
+    application.add_handler(CommandHandler("help", help))
     application.add_handler(tz_conversation)
     application.add_handler(CommandHandler("list", list_all))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, new_msg))

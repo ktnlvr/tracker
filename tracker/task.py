@@ -41,7 +41,7 @@ def task_from_text(text: str, tz: timezone | None = None):
     special_spans = []
 
     matched_priority = priority_regex.search(text)
-    priority = matched_priority.group(0).count('!') if matched_priority else 0
+    priority = matched_priority.group(0).count("!") if matched_priority else 0
     matched_time24 = time24_regex.search(text)
     time24 = matched_time24.group(0) if matched_time24 else None
 
