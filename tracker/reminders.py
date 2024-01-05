@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta, timezone
+from emoji import emojize
 from telegram.ext import Application
 
 
@@ -7,13 +8,19 @@ from .task import Task
 from .tz import ntp_time_offset
 
 
-def adjusted_now(tz: timezone | None = None) -> datetime:
-    return datetime.now(tz) - timedelta(seconds=ntp_time_offset())
-
-
 async def reminder_job(context: Context):
     job = context.job
     task: Task = job.data
+
+    is_late = (
+        datetime.now(task.at.tzinfo) - task.at - timedelta(seconds=ntp_time_offset())
+    ) > timedelta(minutes=1)
+
+    if is_late:
+        await context.bot.send_message(
+            job.chat_id,
+            emojize(":fire: Due to server downtime the reminder is sent late!"),
+        )
 
     await context.bot.forward_message(
         job.chat_id, job.chat_id, message_id=task.message_id
@@ -27,7 +34,12 @@ async def reminder_job(context: Context):
 def enqueue_reminder(task: Task, application: Application, chat_id: int):
     adjusted_time = task.at - timedelta(seconds=ntp_time_offset())
     application.job_queue.run_once(
-        reminder_job, adjusted_time, name=str(id(task)), chat_id=chat_id, data=task
+        reminder_job,
+        adjusted_time,
+        name=str(id(task)),
+        chat_id=chat_id,
+        data=task,
+        job_kwargs={"misfire_grace_time": None},
     )
 
 

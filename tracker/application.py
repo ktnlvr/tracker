@@ -12,12 +12,13 @@ from telegram.ext import (
 )
 from timezonefinder import TimezoneFinder
 from pytz import timezone, all_timezones
+from datetime import datetime, timedelta
 
 from .env import TOKEN
 from .context import ChatData, Context
 from .reminders import dequeue_reminder, enqueue_reminder
 from .task import task_from_text
-from .tz import refresh_ntp_time_offset
+from .tz import ntp_time_offset, refresh_ntp_time_offset, true_now
 
 tz_finder = TimezoneFinder()
 
@@ -25,7 +26,7 @@ tz_finder = TimezoneFinder()
 async def new_msg(update: Update, context: Context) -> None:
     from re import compile
 
-    data = context.chat_data
+    chat = context.chat_data
 
     remove_item_matcher = compile(r"-[0-9]+")
 
@@ -35,7 +36,7 @@ async def new_msg(update: Update, context: Context) -> None:
     if all(map(lambda substr: remove_item_matcher.match(substr), text.split())):
         indices = list(map(lambda t: int(t[1:]), text.split()))
         for i, idx in enumerate(indices):
-            task = data.delete_task(idx - i - 1)
+            task = chat.delete_task(idx - i - 1)
             dequeue_reminder(context, task)
 
         await update.message.reply_markdown(
@@ -43,12 +44,14 @@ async def new_msg(update: Update, context: Context) -> None:
         )
         return
 
-    task = task_from_text(update.message.text, tz=data.tz)
-    task.message_id = update.message.message_id
-    data.add_task(task)
+    task = task_from_text(update.message.text, tz=chat.tz)
 
     if task.at != None:
-        if data.tz != None:
+        if task.at < true_now(task.at.tzinfo):
+            await update.message.reply_markdown("Can't schedule a task in the past")
+            return
+
+        if chat.tz != None:
             enqueue_reminder(task, context.application, update.effective_chat.id)
         else:
             await update.message.reply_markdown(
@@ -57,8 +60,11 @@ async def new_msg(update: Update, context: Context) -> None:
                 )
             )
 
+    task.message_id = update.message.message_id
+    chat.add_task(task)
+
     idx = 0
-    for i, t in enumerate(data.active_tasks):
+    for i, t in enumerate(chat.active_tasks):
         if t is task:
             idx = i
             break
@@ -92,13 +98,18 @@ async def msg_to_tz(update: Update, context: Context) -> int:
         tz = update.effective_message.text
 
     if tz not in all_timezones:
-        # TODO: timezone not found
+        await update.message.reply_markdown(
+            f"Sorry, timezone `{tz}` not found. Please make sure the timezone is formatted according to the timezone name like `UTC` or `Europe/Berlin`"
+        )
         return 0
+
     tz = timezone(tz)
     context.chat_data.tz = tz
 
+    time_on_server = datetime.now() + timedelta(seconds=ntp_time_offset())
+
     await update.message.reply_markdown(
-        f"Your timezone is `{tz}`, all the timers will adjust accordingly"
+        f"Your timezone is `{tz}`, all future timers will adjust accordingly. Time on the server: {time_on_server}"
     )
     return ConversationHandler.END
 

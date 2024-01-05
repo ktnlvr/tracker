@@ -5,15 +5,15 @@ from emoji import emojize
 from telegram.helpers import escape_markdown
 import re
 
-from .tz import ntp_time_offset
+from .tz import true_now
 
-priority_regex = re.compile(r"(!+)")
+priority_regex = re.compile(r"((?:\\?!)+)")
 time24_regex = re.compile(r"([0-9]{1,2}:[0-9]{2})")
 
 
 class Task(BaseModel):
     text: Optional[str]
-    priority: Optional[int]
+    priority: int
     at: Optional[datetime]
     message_id: Optional[int]
 
@@ -33,10 +33,7 @@ class Task(BaseModel):
         return text
 
     def sort_key(self) -> tuple:
-        return (
-            self.at.replace(hour=0, minute=0, second=0, microsecond=0),
-            self.priority,
-        )
+        return self.priority
 
 
 def task_from_text(text: str, tz: timezone | None = None):
@@ -44,7 +41,7 @@ def task_from_text(text: str, tz: timezone | None = None):
     special_spans = []
 
     matched_priority = priority_regex.search(text)
-    priority = len(matched_priority.group(0)) if matched_priority else None
+    priority = matched_priority.group(0).count('!') if matched_priority else 0
     matched_time24 = time24_regex.search(text)
     time24 = matched_time24.group(0) if matched_time24 else None
 
@@ -54,7 +51,7 @@ def task_from_text(text: str, tz: timezone | None = None):
         hours, minutes = map(int, time24.split(":"))
 
         # convert to true, system independent time
-        now = datetime.now(tz) + timedelta(seconds=ntp_time_offset())
+        now = true_now()
         at = now.replace(hour=hours, minute=minutes, second=0, microsecond=0)
         if at < now:
             at += timedelta(days=1)
@@ -66,10 +63,3 @@ def task_from_text(text: str, tz: timezone | None = None):
         message_id=None,
         special_spans=special_spans,
     )
-
-
-def descriptor_from_task(task: Task) -> str:
-    out = ""
-    if task.at != None:
-        out += f":alarm_clock:"
-    return emojize(out)
